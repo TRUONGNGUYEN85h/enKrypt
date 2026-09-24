@@ -27,6 +27,16 @@ export const onMessageListeners = new Map<
 const messageQueue = new Set<IQueuedMessage>();
 const portMap = new Map<string, Runtime.Port>();
 
+const SAFE_ERROR_CTORS: Record<string, new (message?: string) => Error> = {
+  Error,
+  EvalError,
+  RangeError,
+  ReferenceError,
+  SyntaxError,
+  TypeError,
+  URIError,
+};
+
 const port: Runtime.Port = null;
 
 // these facilitate communication with window contexts ("injected scripts")
@@ -52,10 +62,8 @@ const handleInboundMessage = async (
       const { err, data } = message;
       if (err) {
         const dehydratedErr = err as Record<string, string>;
-        const errCtr = self[dehydratedErr.name] as any;
-        const hydratedErr = new (typeof errCtr === "function" ? errCtr : Error)(
-          dehydratedErr.message,
-        );
+        const ErrorCtor = SAFE_ERROR_CTORS[dehydratedErr.name] ?? Error;
+        const hydratedErr = new ErrorCtor(dehydratedErr.message);
         Object.keys(dehydratedErr).forEach((prop) => {
           hydratedErr[prop] = dehydratedErr[prop];
         });
